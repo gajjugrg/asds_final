@@ -1,0 +1,193 @@
+---
+title: "Project 4"
+author: "Gajendra Gurung & Rohan Ruthvik Kendyala"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# Load data
+data <- read.csv("Housing.csv")
+head(data)
+dim(data)
+
+# Clean data: Convert factors to numeric if necessary and handle NAs
+data <- data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.numeric), ~replace(., is.na(.), mean(., na.rm = TRUE))))
+
+# Adjust price in thousands for easier interpretation
+data$price <- data$price / 1000000
+
+# Plot histograms for integer variables, price scaled to thousands
+int_vars <- c("price", "area", "bedrooms", "bathrooms", "stories", "parking")
+for (var in int_vars) {
+  p <- ggplot(data, aes(x = .data[[var]])) +
+    geom_histogram(bins=30, fill="steelblue", color="black") +
+    ggtitle(paste("Histogram of", var)) +
+    labs(x = ifelse(var == "price", "Price (in Million Dollars)", var)) +
+    theme_classic() 
+  print(p)
+}
+
+# Plot pie charts for yes/no variables with percentages
+yes_no_vars <- c("mainroad", "guestroom", "basement", "hotwaterheating", "airconditioning", "prefarea")
+for (var in yes_no_vars) {
+  counts <- table(data[[var]])
+  labels <- paste0(names(counts), "\n", round(100 * counts / sum(counts), 1), "%")
+  pie <- pie(counts, labels = labels, main=paste("Pie Chart of", var), col=c("lightblue", "salmon"))
+  print(pie)
+}
+
+# Plot pie chart for furnishing status
+furnishing_counts <- table(data$furnishingstatus)
+labels <- paste0(names(furnishing_counts), "\n", 
+                 round(100 * furnishing_counts / sum(furnishing_counts), 1), "%")
+
+# Create the pie chart
+pie(furnishing_counts, labels = labels, 
+    main = "Pie Chart of Furnishing Status", 
+    col = c("lightblue", "salmon", "lightgreen"))
+
+```
+
+```{r}
+ggplot(data) +
+  geom_density(aes(x = price, y = ..scaled..), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = area, y = ..scaled..), fill = "red", alpha = 0.5) +
+  ggtitle("Density Plots of Price (in thousands) and Area") +
+  xlab("Value") +
+  ylab("Density") +
+  scale_x_continuous(name = "Value", labels = scales::comma) +
+  theme_minimal() +
+  scale_color_manual(values = c("Price" = "blue", "Area" = "red"))
+```
+
+```{r}
+library(reshape2)
+numeric_data <- select_if(data, is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs")  # Handles missing values by using available data
+
+print(cor_matrix)
+
+# Melt the correlation matrix for ggplot2
+melted_cor_matrix <- melt(cor_matrix)
+
+# Plot the correlation matrix as a heatmap with numerical annotations
+ggplot(melted_cor_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +  # Add white borders to separate the tiles
+  geom_text(aes(label = sprintf("%.2f", value)), size = 3, vjust = 1) +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), space = "Lab", name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(angle = 0, hjust = 1)) +
+  labs(x = "", y = "", title = "Correlation Matrix Heatmap")
+```
+
+```{r}
+data <- data %>%
+  mutate(across(c(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea),
+                ~ as.numeric(. == "yes")))  # Converting 'yes'/'no' to 1/0
+
+# One-hot encoding for 'furnishingstatus'
+data <- data %>%
+  mutate(furnishingstatus_furnished = as.numeric(furnishingstatus == "furnished"),
+         furnishingstatus_semi = as.numeric(furnishingstatus == "semi-furnished"),
+         furnishingstatus_unfurnished = as.numeric(furnishingstatus == "unfurnished"))
+
+# Select only numeric columns for correlation
+numeric_data <- select_if(data, is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs")  # Handles missing values by using available data
+
+# Print correlation matrix
+print(cor_matrix)
+
+
+melted_cor_matrix <- melt(cor_matrix)
+
+ggplot(melted_cor_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", value)), size = 3, vjust = 1) +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), space = "Lab", name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "", title = "Extended Correlation Matrix Heatmap")
+```
+```{r}
+# Build the linear regression model
+model <- lm(price ~ area + bathrooms + airconditioning + stories + parking, data = data)
+
+# Print the model summary to see coefficients and model statistics
+model_summary<-summary(model)
+plot(model)
+# Extract R-squared value
+r_squared <- model_summary$r.squared
+cat("R-squared value:", r_squared, "\n")
+
+# Calculate residuals
+residuals <- model$residuals
+
+# Calculate Mean Squared Error (MSE)
+mse <- mean(residuals^2)
+cat("Mean Squared Error (MSE):", mse, "\n")
+```
+
+```{r}
+library(caret)
+set.seed(123)
+index <- createDataPartition(data$price, p = 0.70, list = FALSE)
+train_data <- data[index, ]
+test_data <- data[-index, ]
+model_train <- lm(price ~ area + bathrooms + airconditioning + stories + parking, data = train_data)
+# Predicting on training data
+train_predictions <- predict(model_train, newdata = train_data)
+
+# Calculating MSE for training data
+train_mse <- mean((train_data$price - train_predictions)^2)
+
+# Predicting on testing data
+test_predictions <- predict(model_train, newdata = test_data)
+
+# Calculating MSE for testing data
+test_mse <- mean((test_data$price - test_predictions)^2)
+
+cat("MSE for Training Data:", train_mse, "\n")
+cat("MSE for Testing Data:", test_mse, "\n")
+
+```
+```{r}
+# Set up 5-fold cross-validation
+set.seed(123)  # for reproducibility
+train_control <- trainControl(method = "cv", number = 5, savePredictions = "final")
+
+# Build the model using cross-validation
+model_cv <- train(price ~ area + bathrooms + airconditioning + stories + parking, 
+                  data = data, 
+                  method = "lm", 
+                  trControl = train_control)
+
+# Extracting and calculating average MSE from cross-validation
+cv_results <- model_cv$results
+print(cv_results)
+average_rmse <- cv_results$RMSE
+
+# Output the average RMSE
+cat("Average RMSE from 5-fold Cross-Validation:", average_rmse, "\n")
+```
+
+
+
+
+
+
