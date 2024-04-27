@@ -18,6 +18,10 @@ data <- read.csv("Housing.csv")
 head(data)
 dim(data)
 
+
+Just a small change here
+
+
 # Clean data: Convert factors to numeric if necessary and handle NAs
 data <- data %>%
   mutate(across(where(is.character), as.factor)) %>%
