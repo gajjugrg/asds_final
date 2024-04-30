@@ -8,8 +8,7 @@ output:
     df_print: paged
 ---
 
-
-```{r}
+```{r message=TRUE, warning=TRUE, paged.print=TRUE}
 library(readr)
 library(dplyr)
 library(ggplot2)
@@ -17,14 +16,15 @@ library(ggplot2)
 # Load data
 data <- read.csv("Housing.csv")
 head(data)
-dim(data)
+dim(data) 
+
+summary(data)
 
 # Clean data: Convert factors to numeric if necessary and handle NAs
 data <- data %>%
   mutate(across(where(is.character), as.factor)) %>%
   mutate(across(where(is.numeric), ~replace(., is.na(.), mean(., na.rm = TRUE))))
 ```
-
 
 ```{r}
 data$price <- data$price / 1000000  # Scale price to millions for better visualization
@@ -53,8 +53,7 @@ for (i in seq_along(int_vars)) {
 
 ```
 
-
-```{r}
+```{r message=TRUE, warning=TRUE, paged.print=TRUE}
 # Plot histograms for integer variables, price scaled to thousands
 int_vars <- c("price", "area", "bedrooms", "bathrooms", "stories", "parking")
 bins_settings <- c(30, 30, 6, 4, 4, 3)  # Custom bin settings for each variable
@@ -84,7 +83,7 @@ for (i in seq_along(int_vars)) {
 }
 ```
 
-```{r}
+```{r echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 library(ggplot2)
 
 # Define categorical "yes/no" variables and their custom titles
@@ -172,7 +171,6 @@ p <- ggplot(data, aes(x = price, color = furnishingstatus, fill = furnishingstat
 print(p)
 ```
 
-
 ```{r}
 library(reshape2)
 numeric_data <- select_if(data, is.numeric)
@@ -227,6 +225,7 @@ ggplot(melted_cor_matrix, aes(Var1, Var2, fill = value)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(x = "", y = "", title = "Extended Correlation Matrix Heatmap")
 ```
+
 ```{r}
 # Build the linear regression model
 model <- lm(price ~ area + bathrooms + airconditioning, data = data)
@@ -249,6 +248,7 @@ cat("Mean Squared Error (MSE):", mse, "\n")
 
 ```{r}
 library(caret)
+library(lattice)
 set.seed(123)
 index <- createDataPartition(data$price, p = 0.70, list = FALSE)
 train_data <- data[index, ]
@@ -270,6 +270,7 @@ cat("MSE for Training Data:", train_mse, "\n")
 cat("MSE for Testing Data:", test_mse, "\n")
 
 ```
+
 ```{r}
 # Set up 5-fold cross-validation
 set.seed(123)  # for reproducibility
@@ -294,14 +295,9 @@ ggplot(data = cv_results, aes(x = factor(1), y = RMSE)) +
     theme_minimal()
 
 ```
-```{r}
-library(caret)
+
+```{r message=TRUE, warning=TRUE}
+library(car)
 vif_model <- vif(lm(price ~ area + bathrooms + airconditioning, data = data))
 print(vif_model)
 ```
-
-
-
-
-
-
