@@ -20,10 +20,12 @@ dim(data)
 
 summary(data)
 
+dim(data)
 # Clean data: Convert factors to numeric if necessary and handle NAs
 data <- data %>%
   mutate(across(where(is.character), as.factor)) %>%
   mutate(across(where(is.numeric), ~replace(., is.na(.), mean(., na.rm = TRUE))))
+dim(data)
 ```
 
 ```{r}
