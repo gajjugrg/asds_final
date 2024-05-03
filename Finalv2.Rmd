@@ -1,0 +1,320 @@
+---
+title: "Project 4"
+author: "Gajendra Gurung & Rohan Ruthvik Kendyala"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r message=TRUE, warning=TRUE, paged.print=TRUE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# Load data
+data <- read.csv("Housing.csv")
+head(data)
+dim(data) 
+
+summary(data)
+
+dim(data)
+# Clean data: Convert factors to numeric if necessary and handle NAs
+data <- data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.numeric), ~replace(., is.na(.), mean(., na.rm = TRUE))))
+dim(data)
+```
+
+```{r}
+data$price <- data$price / 1000000  # Scale price to millions for better visualization
+# Define integer variables and their titles
+int_vars <- c("price", "area", "bedrooms", "bathrooms", "stories", "parking")
+int_titles <- c("Histogram of Price (in Millions)", "Histogram of Area",
+                "Histogram of Bedrooms", "Histogram of Bathrooms",
+                "Histogram of Stories", "Histogram of Parking")
+x_labels <- c("Price (in Million Dollars)", "Area (sq ft)", "Number of Bedrooms", 
+              "Number of Bathrooms", "Number of Stories", "Number of Parking Spots")
+
+# Plot histograms with custom x-axis labels
+for (i in seq_along(int_vars)) {
+  var <- int_vars[i]
+  title <- int_titles[i]
+  x_label <- x_labels[i]
+  
+  p <- ggplot(data, aes(x = .data[[var]])) +
+    geom_histogram(bins=30, fill="#404080",alpha=0.6, color="#404080") +
+    ggtitle(title) +
+    labs(x = x_label) + 
+    theme_minimal()
+  print(p)
+}
+
+
+```
+
+```{r message=TRUE, warning=TRUE, paged.print=TRUE}
+# Plot histograms for integer variables, price scaled to thousands
+int_vars <- c("price", "area", "bedrooms", "bathrooms", "stories", "parking")
+bins_settings <- c(30, 30, 6, 4, 4, 3)  # Custom bin settings for each variable
+
+for (i in seq_along(int_vars)) {
+  var <- int_vars[i]
+  bins <- bins_settings[i]
+  
+  # Adjust for discrete variables
+  if (var %in% c("bedrooms", "bathrooms", "parking", "stories")) {
+    # Make sure to convert to factor if grouping is necessary
+    data[[var]] <- as.factor(data[[var]])
+    p <- ggplot(data, aes(x = .data[[var]], fill = .data[[var]])) +
+      geom_histogram(stat = "count", position = "dodge", color = "black") +  
+      ggtitle(paste("Histogram of", var)) +
+      labs(x = var, y = "Count") +
+      theme_minimal()
+  } else {
+    p <- ggplot(data, aes(x = .data[[var]])) +
+      geom_histogram(bins = bins, fill = "steelblue", color = "black") +
+      ggtitle(paste("Histogram of", var)) +
+      labs(x = ifelse(var == "price", "Price (in Millions of Dollars)", var)) +
+      theme_minimal()
+  }
+
+  print(p)
+}
+```
+
+```{r echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+library(ggplot2)
+
+# Define categorical "yes/no" variables and their custom titles
+yes_no_vars <- c("mainroad", "guestroom", "basement", "hotwaterheating",
+                 "airconditioning", "prefarea")
+titles <- c("Mainroad", "Guestroom", "Basement", "Hot Water Heating",
+            "Air Conditioning", "Preferred Area")
+
+# Plot pie charts for each yes/no variable using custom titles
+for (i in seq_along(yes_no_vars)) {
+  var <- yes_no_vars[i]
+  title <- titles[i]
+  
+  # Generate counts and labels
+  counts <- table(data[[var]])
+  labels <- paste0(names(counts), "\n", round(100 * counts / sum(counts), 1), "%")
+  
+  # Create pie chart with specific title and color
+  pie <- pie(counts, labels = labels, 
+             main = paste("Pie Chart of", title), 
+             col = c("lightblue", "salmon"))
+  print(pie)
+}
+lightblue_alpha <- rgb(173/255, 216/255, 230/255, alpha = 0.5)  # Light Blue with 50% transparency
+darkblue_alpha <- rgb(0/255, 0/255, 139/255, alpha = 0.5)       # Dark Blue with 50% transparency
+lightgreen_alpha <- rgb(144/255, 238/255, 144/255, alpha = 0.5) # Light Green with 50% transparency
+
+
+# Plot pie chart for furnishing status
+furnishing_counts <- table(data$furnishingstatus)
+labels <- paste0(names(furnishing_counts), "\n", 
+                 round(100 * furnishing_counts / sum(furnishing_counts), 1), "%")
+
+# Create the pie chart for Furnishing Status using the specified title
+pie(furnishing_counts, labels = labels, 
+    main = "Pie Chart of Furnishing Status", 
+    col = c(lightblue_alpha, darkblue_alpha, lightgreen_alpha))
+
+```
+
+```{r}
+# Define categorical "yes/no" variables to plot against
+yes_no_vars <- c("mainroad", "guestroom", "basement", 
+                 "hotwaterheating", "airconditioning", "prefarea")
+titles <- c("Mainroad", "Guestroom", "Basement", 
+            "Hot Water Heating", "Air Conditioning", "Preferred Area")
+
+# Loop through each "yes/no" variable to create histograms
+for (i in seq_along(yes_no_vars)) {
+  var <- yes_no_vars[i]
+  title <- titles[i]
+  # Calculate group means for vertical lines
+  group_means <- data %>%
+    group_by(.data[[var]]) %>%
+    summarize(grp.mean = mean(price, na.rm = TRUE), .groups = 'drop')
+  
+  p <- ggplot(data, aes(x = price, color = .data[[var]], fill = .data[[var]])) +
+    geom_histogram(bins = 20, alpha = 0.6) +
+    geom_vline(data = group_means, aes(xintercept = grp.mean, 
+                                       color = .data[[var]]), linetype = "dashed") +
+    scale_fill_brewer(palette = "Dark2") +
+    scale_color_brewer(palette = "Dark2") +
+    ggtitle(paste("Histogram of Price by", title)) +
+    labs(x = "Price (in Millions)", y = "Count") +
+    theme_minimal() +
+    theme(legend.position = "top")
+  
+  # Print each plot
+  print(p)
+}
+```
+
+```{r}
+furnishing_means <- data %>%
+    group_by(furnishingstatus) %>%
+    summarize(grp.mean = mean(price, na.rm = TRUE), .groups = 'drop')
+
+# Create histogram for furnishing status
+p <- ggplot(data, aes(x = price, color = furnishingstatus, fill = furnishingstatus)) +
+    geom_histogram(bins = 20, alpha = 0.6) +
+    geom_vline(data = furnishing_means, 
+               aes(xintercept = grp.mean, color = furnishingstatus), 
+               linetype = "dashed") +
+    scale_fill_brewer(palette = "Paired") +  
+  # Using 'Paired' to visually distinguish categories clearly
+    scale_color_brewer(palette = "Paired") +
+    ggtitle("Histogram of Price by Furnishing Status") +
+    labs(x = "Price (in Millions)", y = "Count") +
+    theme_minimal() +
+    theme(legend.position = "top")
+
+# Print the plot
+print(p)
+```
+
+```{r}
+library(reshape2)
+numeric_data <- select_if(data, is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs")  
+# Handles missing values by using available data
+
+print(cor_matrix)
+
+# Melt the correlation matrix for ggplot2
+melted_cor_matrix <- melt(cor_matrix)
+
+# Plot the correlation matrix as a heatmap with numerical annotations
+ggplot(melted_cor_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +  # Add white borders to separate the tiles
+  geom_text(aes(label = sprintf("%.2f", value)), size = 3, vjust = 1) +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(angle = 0, hjust = 1)) +
+  labs(x = "", y = "", title = "Correlation Matrix Heatmap")
+```
+
+```{r}
+data <- data %>%
+  mutate(across(c(mainroad, guestroom, basement, 
+                  hotwaterheating, airconditioning, prefarea),
+                ~ as.numeric(. == "yes")))  # Converting 'yes'/'no' to 1/0
+
+# One-hot encoding for 'furnishingstatus'
+data <- data %>%
+  mutate(furnishingstatus_furnished = as.numeric(furnishingstatus == "furnished"),
+         furnishingstatus_semi = as.numeric(furnishingstatus == "semi-furnished"),
+         furnishingstatus_unfurnished = as.numeric(furnishingstatus == "unfurnished"))
+
+# Select only numeric columns for correlation
+numeric_data <- select_if(data, is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs") 
+# Handles missing values by using available data
+
+# Print correlation matrix
+print(cor_matrix)
+
+
+melted_cor_matrix <- melt(cor_matrix)
+
+ggplot(melted_cor_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", value)), size = 3, vjust = 1) +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", 
+                       name="Correlation") +
+                       theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "", title = "Extended Correlation Matrix Heatmap")
+```
+
+```{r}
+# Build the linear regression model
+model <- lm(price ~ area + bathrooms + airconditioning, data = data)
+
+# Print the model summary to see coefficients and model statistics
+summary(model)
+model_summary<-summary(model)
+plot(model)
+# Extract R-squared value
+r_squared <- model_summary$r.squared
+cat("R-squared value:", r_squared, "\n")
+
+# Calculate residuals
+residuals <- model$residuals
+
+# Calculate Mean Squared Error (MSE)
+mse <- mean(residuals^2)
+cat("Mean Squared Error (MSE):", mse, "\n")
+```
+
+```{r}
+library(caret)
+library(lattice)
+set.seed(123)
+index <- createDataPartition(data$price, p = 0.70, list = FALSE)
+train_data <- data[index, ]
+test_data <- data[-index, ]
+model_train <- lm(price ~ area + bathrooms + airconditioning + stories, 
+                  data = train_data)
+# Predicting on training data
+train_predictions <- predict(model_train, newdata = train_data)
+
+# Calculating MSE for training data
+train_mse <- mean((train_data$price - train_predictions)^2)
+
+# Predicting on testing data
+test_predictions <- predict(model_train, newdata = test_data)
+
+# Calculating MSE for testing data
+test_mse <- mean((test_data$price - test_predictions)^2)
+
+cat("MSE for Training Data:", train_mse, "\n")
+cat("MSE for Testing Data:", test_mse, "\n")
+
+```
+
+```{r}
+# Set up 5-fold cross-validation
+set.seed(123)  # for reproducibility
+train_control <- trainControl(method = "cv", number = 5, savePredictions = "all")
+
+# Build the model using cross-validation
+model_cv <- train(price ~ area + bathrooms + airconditioning, 
+                  data = data, 
+                  method = "lm", 
+                  trControl = train_control)
+
+# Extracting and calculating average MSE from cross-validation
+cv_results <- model_cv$results
+print(cv_results)
+average_rmse <- cv_results$RMSE
+
+# Output the average RMSE
+cat("Average RMSE from 5-fold Cross-Validation:", average_rmse, "\n")
+ggplot(data = cv_results, aes(x = factor(1), y = RMSE)) +
+    geom_boxplot() +
+    labs(title = "Distribution of RMSE Across Folds", y = "RMSE", x = "") +
+    theme_minimal()
+
+```
+
+```{r message=TRUE, warning=TRUE}
+library(car)
+vif_model <- vif(lm(price ~ area + bathrooms + airconditioning, data = data))
+print(vif_model)
+```
